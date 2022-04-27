@@ -1,5 +1,5 @@
 # Databricks notebook source
-pip install https://pypi.python.org/packages/source/P/PrettyTable/prettytable-0.7.2.tar.bz2
+#pip install https://pypi.python.org/packages/source/P/PrettyTable/prettytable-0.7.2.tar.bz2
 
 # COMMAND ----------
 
@@ -8,15 +8,17 @@ import json
 import prettytable
 import os
 headers = {'Content-type': 'application/json'}
-# APU000074712 is the series id for gasoline price year over year https://download.bls.gov/pub/time.series/ap/ap.data.2.Gasoline
+# APU000074714  - Gasoline, unleaded regular, per gallon/3.785 liters in U.S. city average, average price, not seasonally adjusted  	 https://download.bls.gov/pub/time.series/ap/ap.data.2.Gasoline
 # CUSR0000SA0 is the series id for all items year over year https://download.bls.gov/pub/time.series/cu/cu.data.1.AllItems
-data = json.dumps({"seriesid": ['APU000074712','CUSR0000SA0'],"startyear":"1988", "endyear":"2014"})
+data = json.dumps({"seriesid": ['APU000074714', 'APU000074714', 'APU000074714', 'APU000074714', 'APU000074714', 'APU000074714'],"startyear":"1976", "endyear":"2022"})
 p = requests.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers)
 #print(p.text)
 json_data = json.loads(p.text)
 #print(json_data)
+#dbutils.fs.put("dbfs:/FileStore/my-stuff/" + 'APU000074714' + '.txt', p.text, overwrite=True)
 
 #print(os.getcwd())
+i = 0
 for series in json_data['Results']['series']:
     x=prettytable.PrettyTable(["series id","year","period","value","footnotes"])
     seriesId = series['seriesID']
@@ -33,7 +35,8 @@ for series in json_data['Results']['series']:
     output = open(seriesId + '.txt','w')
     #print(seriesId)
     output.write (x.get_string())
-    dbutils.fs.put("dbfs:/FileStore/my-stuff/" + seriesId + '.txt', x.get_string(), overwrite=True)
+    i = i+1
+    dbutils.fs.put("dbfs:/FileStore/my-stuff/" + seriesId + str(i) + '.txt', x.get_string(), overwrite=True)
     #print(x)
     output.close()
 
@@ -46,11 +49,17 @@ display(dbutils.fs.ls("dbfs:/FileStore/my-stuff"))
 
 #gas_price = sqlContext.read.text("dbfs:/FileStore/my-stuff/APU000074712.txt").rdd
 #display(gas_price.take(5))
+#gas_price = spark.read.text(
+#  'dbfs:/FileStore/my-stuff/APU000074714.txt'
+#)
+#gas_price.printSchema()
+#display(gas_price)
+
 gas_price = spark.read.text(
-  'dbfs:/FileStore/my-stuff/APU000074712.txt'
+  'dbfs:/FileStore/my-stuff/APU0000747141.txt'
 )
-gas_price.printSchema()
-display(gas_price.take(20))
+#gas_price.printSchema()
+display(gas_price)
 
 # COMMAND ----------
 
@@ -81,6 +90,18 @@ df_gas_price_workable = df_gas_price_null_value_removed_new_combine_values.selec
 
 grouped_aggregated = df_gas_price_workable.groupBy("year").agg(avg("actual_value").alias("gas price average")) #group by year, and take avg values of all the years
 grouped_aggregated_sorted = grouped_aggregated.orderBy(col("year"))
-display(grouped_aggregated_sorted.take(5))                                                               
+display(grouped_aggregated_sorted)                                                               
 
 
+
+# COMMAND ----------
+
+from pyspark.sql.window import Window
+from pyspark.sql.functions import col
+W = Window.orderBy('year')
+
+percent_change = grouped_aggregated_sorted.withColumn('gas price average-1',f.lag(grouped_aggregated_sorted['gas price average']).over(W))\
+  .withColumn('var %', f.round((f.col('gas price average')/f.col('gas price average-1') -1)*100,2))
+#percent_change.show()
+percent_change_only = percent_change.select(col("year"), col("var %"))
+display(percent_change_only)
