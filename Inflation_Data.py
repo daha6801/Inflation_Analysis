@@ -3,42 +3,62 @@
 
 # COMMAND ----------
 
+#dbutils.fs.help("put")
+dbutils.fs.rm("dbfs:/FileStore/my-stuff/APU0000747141.txt")
+
+# COMMAND ----------
+
+from requests.auth import HTTPBasicAuth
 import requests
 import json
 import prettytable
 import os
 headers = {'Content-type': 'application/json'}
+auth = HTTPBasicAuth('apikey','bf323d2b0dff40a79cf1df469caec067')
 # APU000074714  - Gasoline, unleaded regular, per gallon/3.785 liters in U.S. city average, average price, not seasonally adjusted  	 https://download.bls.gov/pub/time.series/ap/ap.data.2.Gasoline
 # CUSR0000SA0 is the series id for all items year over year https://download.bls.gov/pub/time.series/cu/cu.data.1.AllItems
-data = json.dumps({"seriesid": ['APU000074714', 'APU000074714', 'APU000074714', 'APU000074714', 'APU000074714', 'APU000074714'],"startyear":"1976", "endyear":"2022"})
-p = requests.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers)
-#print(p.text)
-json_data = json.loads(p.text)
-#print(json_data)
-#dbutils.fs.put("dbfs:/FileStore/my-stuff/" + 'APU000074714' + '.txt', p.text, overwrite=True)
-
-#print(os.getcwd())
-i = 0
-for series in json_data['Results']['series']:
-    x=prettytable.PrettyTable(["series id","year","period","value","footnotes"])
-    seriesId = series['seriesID']
-    for item in series['data']:
-        year = item['year']
-        period = item['period']
-        value = item['value']
-        footnotes=""
-        for footnote in item['footnotes']:
-            if footnote:
-                footnotes = footnotes + footnote['text'] + ','
-        if 'M01' <= period <= 'M12':
-            x.add_row([seriesId,year,period,value,footnotes[0:-1]])
-    output = open(seriesId + '.txt','w')
-    #print(seriesId)
-    output.write (x.get_string())
+startyeardate = 1976
+endyeardate = 2022
+master_string = ""
+for i in range(0, 5):
     i = i+1
-    dbutils.fs.put("dbfs:/FileStore/my-stuff/" + seriesId + str(i) + '.txt', x.get_string(), overwrite=True)
-    #print(x)
-    output.close()
+    print(i)
+    print(startyeardate)
+    print(endyeardate)
+    if startyeardate >= 1976 or endyeardate <= 2022:
+        data = json.dumps({"seriesid": ['APU000074714', 'APU000074714'],"startyear":str(startyeardate), "endyear":str(endyeardate)})
+        print(data)
+        p = requests.post('https://api.bls.gov/publicAPI/v1/timeseries/data/', data=data, headers=headers, auth = auth)
+        print(p.text)
+        json_data = json.loads(p.text)
+        #print(json_data)
+        #dbutils.fs.put("dbfs:/FileStore/my-stuff/" + 'APU000074714' + '.txt', p.text, overwrite=True)
+        startyeardate = startyeardate + 10;
+        endyeardate = endyeardate + 10;
+        print(startyeardate)
+        print(endyeardate)
+        
+        #print(os.getcwd())
+        for series in json_data['Results']['series']:
+            x=prettytable.PrettyTable(["series id","year","period","value","footnotes"])
+            seriesId = series['seriesID']
+            for item in series['data']:
+                year = item['year']
+                period = item['period']
+                value = item['value']
+                footnotes=""
+                for footnote in item['footnotes']:
+                    if footnote:
+                        footnotes = footnotes + footnote['text'] + ','
+                if 'M01' <= period <= 'M12':
+                    x.add_row([seriesId,year,period,value,footnotes[0:-1]])
+            output = open(seriesId + '.txt','w')
+            #print(seriesId)
+            output.write (x.get_string())
+            master_string = master_string + x.get_string()
+            print(i)
+            output.close()
+dbutils.fs.put("dbfs:/FileStore/my-stuff/" + seriesId + str(i) + '.txt', master_string, overwrite=True)
 
 # COMMAND ----------
 
