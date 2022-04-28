@@ -125,11 +125,15 @@ for i in range(0, 5):
     if startyeardate >= 1979 or endyeardate <= 2022:
         data = json.dumps({"seriesid": ['LEU0252881500', 'LEU0252881500'],"startyear":str(startyeardate), "endyear":str(endyeardate)})
         print(data)
-        p = requests.post('https://api.bls.gov/publicAPI/v2/timeseries/data/', data=data, headers=headers, auth = auth)
+        p = requests.post('https://api.bls.gov/publicAPI/v1/timeseries/data/', data=data, headers=headers, auth = auth)
         print(p.text)
         json_data = json.loads(p.text)
+        #print(json_data)
+        #dbutils.fs.put("dbfs:/FileStore/my-stuff/" + 'APU000074714' + '.txt', p.text, overwrite=True)
         startyeardate = startyeardate + 10;
         endyeardate = endyeardate + 10;
+        print(startyeardate)
+        print(endyeardate)
         
         #print(os.getcwd())
         for series in json_data['Results']['series']:
@@ -143,7 +147,7 @@ for i in range(0, 5):
                 for footnote in item['footnotes']:
                     if footnote:
                         footnotes = footnotes + footnote['text'] + ','
-                if 'M01' <= period <= 'M12':
+                if 'Q01' <= period <= 'Q04':
                     x.add_row([seriesId,year,period,value,footnotes[0:-1]])
             output = open(seriesId + '.txt','w')
             #print(seriesId)
@@ -175,12 +179,11 @@ all_items_price = spark.read.text(
 #display(all_items_price)
 
 #Read the all items price from the text file now
-#weekly_wage_salaried_emp = spark.read.text(
-#  'dbfs:/FileStore/my-stuff/LEU02528815004.txt'
-#)
-
-#weekly_wage_salaried_emp.printSchema()
-#display(weekly_wage_salaried_emp)
+wages = spark.read.text(
+  'dbfs:/FileStore/my-stuff/LEU02528815005.txt'
+)
+#gas_price.printSchema()
+display(wages)
 
 # COMMAND ----------
 
@@ -231,6 +234,24 @@ df_all_items_price_null_value_removed_new_combine_values.show()
 
 # COMMAND ----------
 
+#Format the weekly wage data by removing nulls, spliting and merging the columns to make a usable dataframe
+
+wages_chars_removed = wages.select(wages.value, regexp_replace(wages.value, r'\W+', ' ').alias("split_value"))
+wages_columns_split = wages_chars_removed.withColumn("seriesId", split(wages_chars_removed.split_value, " ").getItem(1)).withColumn("year", split(wages_chars_removed.split_value, " ").getItem(2)).withColumn("month", split(wages_chars_removed.split_value, " ").getItem(3)).withColumn("value1", split(wages_chars_removed.split_value, " ").getItem(4)) #split the date and time into separate columns
+wages_columns_split.printSchema()
+#display(wages_columns_split.take(100))
+
+wages_columns_split_updated_cols = wages_columns_split.drop(wages_columns_split.value)
+wages_columns_split_updated_cols2 = wages_columns_split_updated_cols.drop(wages_columns_split_updated_cols.split_value)
+#display(gas_price_columns_split_updated_cols2.take(10))
+
+df_wages_null_value_removed = wages_columns_split_updated_cols2.na.drop()
+df_wages_null_value_removed_new = spark.createDataFrame(df_wages_null_value_removed.tail(df_wages_null_value_removed.count()-1), df_wages_null_value_removed.schema)
+df_wages_null_value_removed_new.show()
+
+
+# COMMAND ----------
+
 import pyspark.sql.functions as f
 
 # COMMAND ----------
@@ -257,6 +278,19 @@ all_tems_grouped_aggregated = df_all_items_price_workable.groupBy("year").agg(av
 all_tems_grouped_aggregated_sorted = all_tems_grouped_aggregated.orderBy(col("year")) # sort by year
 display(all_tems_grouped_aggregated_sorted)        
 
+
+# COMMAND ----------
+
+# Calculate the average of all weekly wages for each year by grouping by year and aggregating by the weekly wage
+
+import pyspark.sql.functions as f
+df_wages_workable = df_wages_null_value_removed_new_combine_values.select(df_wages_null_value_removed_new_combine_values.year, df_wages_null_value_removed_new_combine_values.value1.cast('float'))
+#display(df_gas_price_workable.take(5))
+
+grouped_aggregated = df_wages_workable.groupBy("year").agg(avg("value1").alias("wages average")) #group by year, and take avg values of all the years
+grouped_aggregated_sorted = grouped_aggregated.orderBy(col("year"))
+display(grouped_aggregated_sorted)
+
 # COMMAND ----------
 
 # Do Join to the two data sets for gas price and all items price by year, 
@@ -264,6 +298,11 @@ gas_all_items_avg_price_joined = gas_price_grouped_aggregated_sorted.join(all_te
 display(gas_all_items_avg_price_joined)
 
 # COMMAND ----------
+
+# Join the dataframe with the weekly wage dataframe
+
+wage_gas_all_items_avg_price_joined = gas_all_items_avg_price_joined.join(grouped_aggregated_sorted,["year"])
+display(wage_gas_all_items_avg_price_joined)
 
 #from pyspark.sql.functions import col
 #from pyspark.sql.window import Window
