@@ -1,5 +1,5 @@
 # Databricks notebook source
-#pip install https://pypi.python.org/packages/source/P/PrettyTable/prettytable-0.7.2.tar.bz2
+pip install https://pypi.python.org/packages/source/P/PrettyTable/prettytable-0.7.2.tar.bz2
 
 # COMMAND ----------
 
@@ -15,8 +15,8 @@ import prettytable
 import os
 headers = {'Content-type': 'application/json'}
 auth = HTTPBasicAuth('apikey','bf323d2b0dff40a79cf1df469caec067')
-# APU000074714  - Gasoline, unleaded regular, per gallon/3.785 liters in U.S. city average, average price, not seasonally adjusted  	 https://download.bls.gov/pub/time.series/ap/ap.data.2.Gasoline
-# CUSR0000SA0 is the series id for all items year over year https://download.bls.gov/pub/time.series/cu/cu.data.1.AllItems
+# APU000074714  - Gasoline, unleaded regular, per gallon/3.785 liters in U.S. city average, average price, not seasonally adjusted		1976	M01	2022	M03  https://download.bls.gov/pub/time.series/ap/ap.data.2.Gasoline
+# CUSR0000SA0      	0000	SA0	S	R	S	1982-84=100	All items in U.S. city average, all urban consumers, seasonally adjusted		1947	M01	2022	M03  https://download.bls.gov/pub/time.series/cu/cu.data.1.AllItems
 startyeardate = 1976
 endyeardate = 2022
 master_string = ""
@@ -31,8 +31,6 @@ for i in range(0, 5):
         p = requests.post('https://api.bls.gov/publicAPI/v1/timeseries/data/', data=data, headers=headers, auth = auth)
         print(p.text)
         json_data = json.loads(p.text)
-        #print(json_data)
-        #dbutils.fs.put("dbfs:/FileStore/my-stuff/" + 'APU000074714' + '.txt', p.text, overwrite=True)
         startyeardate = startyeardate + 10;
         endyeardate = endyeardate + 10;
         print(startyeardate)
@@ -67,16 +65,8 @@ display(dbutils.fs.ls("dbfs:/FileStore/my-stuff"))
 
 # COMMAND ----------
 
-#gas_price = sqlContext.read.text("dbfs:/FileStore/my-stuff/APU000074712.txt").rdd
-#display(gas_price.take(5))
-#gas_price = spark.read.text(
-#  'dbfs:/FileStore/my-stuff/APU000074714.txt'
-#)
-#gas_price.printSchema()
-#display(gas_price)
-
 gas_price = spark.read.text(
-  'dbfs:/FileStore/my-stuff/APU0000747141.txt'
+  'dbfs:/FileStore/my-stuff/APU0000747145.txt'
 )
 #gas_price.printSchema()
 display(gas_price)
@@ -85,31 +75,32 @@ display(gas_price)
 
 from pyspark.sql.functions import *
 from pyspark.sql.functions import regexp_replace
-gas_price_chars_removed = gas_price.select(gas_price.value, regexp_replace(gas_price.value, r'\W+', ' ').alias("split_value"))
-gas_price_columns_split = gas_price_chars_removed.withColumn("seriesId", split(gas_price_chars_removed.split_value, " ").getItem(1)).withColumn("year", split(gas_price_chars_removed.split_value, " ").getItem(2)).withColumn("month", split(gas_price_chars_removed.split_value, " ").getItem(3)).withColumn("value1", split(gas_price_chars_removed.split_value, " ").getItem(4)).withColumn("value2", split(gas_price_chars_removed.split_value, " ").getItem(5)) #split the date and time into separate columns
-gas_price_columns_split.printSchema()
+
+gas_price_chars_removed = gas_price.select(gas_price.value, regexp_replace(gas_price.value, r'\W+', ' ').alias("split_value")) # remove special characters from each row and replace with space
+gas_price_columns_split = gas_price_chars_removed.withColumn("seriesId", split(gas_price_chars_removed.split_value, " ").getItem(1)).withColumn("year", split(gas_price_chars_removed.split_value, " ").getItem(2)).withColumn("month", split(gas_price_chars_removed.split_value, " ").getItem(3)).withColumn("whole_value", split(gas_price_chars_removed.split_value, " ").getItem(4)).withColumn("decimal_value", split(gas_price_chars_removed.split_value, " ").getItem(5)) #split everything into it's own column
 #display(gas_price_columns_split.take(100))
 
-gas_price_columns_split_updated_cols = gas_price_columns_split.drop(gas_price_columns_split.value)
-gas_price_columns_split_updated_cols2 = gas_price_columns_split_updated_cols.drop(gas_price_columns_split_updated_cols.split_value)
+gas_price_columns_split_updated_cols = gas_price_columns_split.drop(gas_price_columns_split.value) #drop the original column(value column) from the dataframe
+gas_price_columns_split_updated_cols2 = gas_price_columns_split_updated_cols.drop(gas_price_columns_split_updated_cols.split_value) # drop split_value column from the dataframe
 #display(gas_price_columns_split_updated_cols2.take(10))
 
-df_gas_price_null_value_removed = gas_price_columns_split_updated_cols2.na.drop()
-df_gas_price_null_value_removed_new = spark.createDataFrame(df_gas_price_null_value_removed.tail(df_gas_price_null_value_removed.count()-1), df_gas_price_null_value_removed.schema)
+df_gas_price_null_value_removed = gas_price_columns_split_updated_cols2.na.drop() #drop any column that doesn't have any values
+#df_gas_price_null_value_removed.show()
+df_gas_price_null_value_removed_new = spark.createDataFrame(df_gas_price_null_value_removed.tail(df_gas_price_null_value_removed.count()-1), df_gas_price_null_value_removed.schema) #remove the first column of the dataframe because it contins strings
 #df_gas_price_null_value_removed_new.show()
 
-df_gas_price_null_value_removed_new_combine_values = df_gas_price_null_value_removed_new.withColumn("actual_value", concat_ws('.', df_gas_price_null_value_removed_new.value1, df_gas_price_null_value_removed_new.value2))
+df_gas_price_null_value_removed_new_combine_values = df_gas_price_null_value_removed_new.withColumn("actual_value", concat_ws('.', df_gas_price_null_value_removed_new.whole_value, df_gas_price_null_value_removed_new.decimal_value)) # merge the whole_value and decimal_value to form the original price
 df_gas_price_null_value_removed_new_combine_values.show()
-#display(df_gas_price_null_value_removed_new_combine_values.take(5))
+
 
 # COMMAND ----------
 
 import pyspark.sql.functions as f
-df_gas_price_workable = df_gas_price_null_value_removed_new_combine_values.select(df_gas_price_null_value_removed_new_combine_values.year, df_gas_price_null_value_removed_new_combine_values.actual_value.cast('float'))
+df_gas_price_workable = df_gas_price_null_value_removed_new_combine_values.select(df_gas_price_null_value_removed_new_combine_values.year, df_gas_price_null_value_removed_new_combine_values.actual_value.cast('float')) #seclect only the year and the price of gasoline
 #display(df_gas_price_workable.take(5))
 
 grouped_aggregated = df_gas_price_workable.groupBy("year").agg(avg("actual_value").alias("gas price average")) #group by year, and take avg values of all the years
-grouped_aggregated_sorted = grouped_aggregated.orderBy(col("year"))
+grouped_aggregated_sorted = grouped_aggregated.orderBy(col("year")) # sort by year
 display(grouped_aggregated_sorted)                                                               
 
 
