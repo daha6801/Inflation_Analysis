@@ -114,50 +114,50 @@ import os
 # Source the the compensation data based on the series id using the data tool API provided by US department of Labor. 
 # LEU0252881500   Weekly and hourly earnings data from the Current Population Survey		1979	Q01	2022	Q01  https://beta.bls.gov/dataViewer/view/timeseries/LEU0252881500
 
-headers = {'Content-type': 'application/json'}
-auth = HTTPBasicAuth('apikey','bf323d2b0dff40a79cf1df469caec067')
-startyeardate = 1979
-endyeardate = 1989
-master_string = ""
-for i in range(0, 5):
-    i = i+1
-    print(i)
-    print(startyeardate)
-    print(endyeardate)
-    if startyeardate >= 1979 or endyeardate <= 2022:
-        data = json.dumps({"seriesid": ['LEU0252881500', 'LEU0252881500'],"startyear":str(startyeardate), "endyear":str(endyeardate)})
-        print(data)
-        p = requests.post('https://api.bls.gov/publicAPI/v1/timeseries/data/', data=data, headers=headers, auth = auth)
-        print(p.text)
-        json_data = json.loads(p.text)
-        #print(json_data)
-        #dbutils.fs.put("dbfs:/FileStore/my-stuff/" + 'APU000074714' + '.txt', p.text, overwrite=True)
-        startyeardate = startyeardate + 10;
-        endyeardate = endyeardate + 10;
-        print(startyeardate)
-        print(endyeardate)
-        
-        #print(os.getcwd())
-        for series in json_data['Results']['series']:
-            x=prettytable.PrettyTable(["series id","year","period","value","footnotes"])
-            seriesId = series['seriesID']
-            for item in series['data']:
-                year = item['year']
-                period = item['period']
-                value = item['value']
-                footnotes=""
-                for footnote in item['footnotes']:
-                    if footnote:
-                        footnotes = footnotes + footnote['text'] + ','
-                if 'Q01' <= period <= 'Q04':
-                    x.add_row([seriesId,year,period,value,footnotes[0:-1]])
-            output = open(seriesId + '.txt','w')
-            #print(seriesId)
-            output.write (x.get_string())
-            master_string = master_string + x.get_string()
-            print(i)
-            output.close()
-dbutils.fs.put("dbfs:/FileStore/my-stuff/" + seriesId + str(i) + '.txt', master_string, overwrite=True) #save the all items price into a text file with the series id in its name
+#headers = {'Content-type': 'application/json'}
+#auth = HTTPBasicAuth('apikey','bf323d2b0dff40a79cf1df469caec067')
+#startyeardate = 1979
+#endyeardate = 1989
+#master_string = ""
+#for i in range(0, 5):
+#    i = i+1
+#    print(i)
+#    print(startyeardate)
+#    print(endyeardate)
+#    if startyeardate >= 1979 or endyeardate <= 2022:
+#        data = json.dumps({"seriesid": ['LEU0252881500', 'LEU0252881500'],"startyear":str(startyeardate), "endyear":str(endyeardate)})
+#        print(data)
+#        p = requests.post('https://api.bls.gov/publicAPI/v1/timeseries/data/', data=data, headers=headers, auth = auth)
+#        print(p.text)
+#        json_data = json.loads(p.text)
+#        #print(json_data)
+#        #dbutils.fs.put("dbfs:/FileStore/my-stuff/" + 'APU000074714' + '.txt', p.text, overwrite=True)
+#        startyeardate = startyeardate + 10;
+#        endyeardate = endyeardate + 10;
+#        print(startyeardate)
+#        print(endyeardate)
+#        
+#        #print(os.getcwd())
+#        for series in json_data['Results']['series']:
+#            x=prettytable.PrettyTable(["series id","year","period","value","footnotes"])
+#            seriesId = series['seriesID']
+#            for item in series['data']:
+#                year = item['year']
+#                period = item['period']
+#                value = item['value']
+#                footnotes=""
+#                for footnote in item['footnotes']:
+#                    if footnote:
+#                        footnotes = footnotes + footnote['text'] + ','
+#                if 'Q01' <= period <= 'Q04':
+#                    x.add_row([seriesId,year,period,value,footnotes[0:-1]])
+#            output = open(seriesId + '.txt','w')
+#            #print(seriesId)
+#            output.write (x.get_string())
+#            master_string = master_string + x.get_string()
+#            print(i)
+#            output.close()
+#dbutils.fs.put("dbfs:/FileStore/my-stuff/" + seriesId + str(i) + '.txt', master_string, overwrite=True) #save the all items price into a text file with the series id in its name
 
 # COMMAND ----------
 
@@ -454,7 +454,7 @@ display(gas_price_percent_change_sorted_by_inflation.take(1))
 gas_price_percent_change_sorted_by_inflation = gas_price_percent_change_only.sort(col('gas price(% change) year over year').asc()).na.drop()
 #display(gas_price_percent_change_sorted_by_inflation)
 
-#select the highest inflation for gas price
+#select the lowest inflation for gas price
 display(gas_price_percent_change_sorted_by_inflation.take(1))
 
 # COMMAND ----------
@@ -470,14 +470,19 @@ display(all_items_percent_change_only)
 
 # COMMAND ----------
 
-# When was the highest inlation rate for gas price between 1976 to 2022
+# When was the highest inlation rate for all items between 1947 to 2022
 all_items_percent_change_sorted_by_inflation = all_items_percent_change_only.sort(col('all items price(% change) year over year').desc()).na.drop()
-#display(gas_price_percent_change_sorted_by_inflation)
+#display(all_items_percent_change_sorted_by_inflation)
 
-#select the highest inflation for gas price
+#select the highest inflation for all items price
 display(all_items_percent_change_sorted_by_inflation.take(1))
 
 
 # COMMAND ----------
 
+# When was the lowest inlation rate for all items between 1947 to 2022
+all_items_percent_change_sorted_by_inflation = all_items_percent_change_only.sort(col('all items price(% change) year over year').asc()).na.drop()
+#display(all_items_percent_change_sorted_by_inflation)
 
+#select the lowest inflation for all items price
+display(all_items_percent_change_sorted_by_inflation.take(1))
