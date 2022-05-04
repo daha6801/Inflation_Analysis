@@ -263,7 +263,7 @@ import pyspark.sql.functions as f
 df_gas_price_workable = df_gas_price_null_value_removed_new_combine_values.select(df_gas_price_null_value_removed_new_combine_values.year, df_gas_price_null_value_removed_new_combine_values.actual_value.cast('float')) #seclect only the year and the price of gasoline
 #display(df_gas_price_workable.take(5))
 
-gas_price_grouped_aggregated = df_gas_price_workable.groupBy("year").agg(avg("actual_value").alias("gas price average")) #group by year, and take avg values of all the years
+gas_price_grouped_aggregated = df_gas_price_workable.groupBy("year").agg(avg("actual_value").alias("gas avg")) #group by year, and take avg values of all the years
 gas_price_grouped_aggregated_sorted = gas_price_grouped_aggregated.orderBy(col("year")) # sort by year
 display(gas_price_grouped_aggregated_sorted)                                                               
 
@@ -276,7 +276,7 @@ display(gas_price_grouped_aggregated_sorted)
 df_all_items_price_workable = df_all_items_price_null_value_removed_new_combine_values.select(df_all_items_price_null_value_removed_new_combine_values.year, df_all_items_price_null_value_removed_new_combine_values.actual_value.cast('float')) #seclect only the year and the price of gasoline
 #display(df_all_items_price_workable.take(5))
 
-all_tems_grouped_aggregated = df_all_items_price_workable.groupBy("year").agg(avg("actual_value").alias("all items price average")) #group by year, and take avg values of all the years
+all_tems_grouped_aggregated = df_all_items_price_workable.groupBy("year").agg(avg("actual_value").alias("all items avg")) #group by year, and take avg values of all the years
 all_tems_grouped_aggregated_sorted = all_tems_grouped_aggregated.orderBy(col("year")) # sort by year
 display(all_tems_grouped_aggregated_sorted)        
 
@@ -289,9 +289,9 @@ import pyspark.sql.functions as f
 df_wages_workable = df_wages_null_value_removed_new.select(df_wages_null_value_removed_new.year, df_wages_null_value_removed_new.value1.cast('float'))
 #display(df_gas_price_workable.take(5))
 
-grouped_aggregated = df_wages_workable.groupBy("year").agg(avg("value1").alias("wages average")) #group by year, and take avg values of all the years
-grouped_aggregated_sorted = grouped_aggregated.orderBy(col("year"))
-display(grouped_aggregated_sorted)
+weekly_wages_grouped_aggregated = df_wages_workable.groupBy("year").agg(avg("value1").alias("weekly wage avg")) #group by year, and take avg values of all the years
+weekly_wages_grouped_aggregated_sorted = weekly_wages_grouped_aggregated.orderBy(col("year"))
+display(weekly_wages_grouped_aggregated_sorted)
 
 # COMMAND ----------
 
@@ -402,7 +402,7 @@ btc_rdd_columns_split.show()
 
 # COMMAND ----------
 
-btc_grouped_and_aggregated = btc_rdd_columns_split.groupBy("year").agg(avg("BTC Price").alias("BTC price average")) #group by year, and take avg values of all the years
+btc_grouped_and_aggregated = btc_rdd_columns_split.groupBy("year").agg(avg("BTC Price").alias("BTC avg")) #group by year, and take avg values of all the years
 btc_grouped_and_aggregated_sorted = btc_grouped_and_aggregated.orderBy(col("year")) # sort by year
 display(btc_grouped_and_aggregated_sorted)  
 
@@ -416,7 +416,7 @@ display(gas_all_items_avg_price_joined)
 
 # Join the dataframe with the weekly wage dataframe
 
-wage_gas_all_items_avg_price_joined = gas_all_items_avg_price_joined.join(grouped_aggregated_sorted,["year"])
+wage_gas_all_items_avg_price_joined = gas_all_items_avg_price_joined.join(weekly_wages_grouped_aggregated,["year"])
 wage_gas_all_items_avg_price_joined_sorted = wage_gas_all_items_avg_price_joined.orderBy(col("year"))
 wage_gas_all_items_avg_price_joined_sorted_null_value_removed = wage_gas_all_items_avg_price_joined_sorted.na.drop()
 display(wage_gas_all_items_avg_price_joined_sorted_null_value_removed)
@@ -424,7 +424,7 @@ display(wage_gas_all_items_avg_price_joined_sorted_null_value_removed)
 
 # COMMAND ----------
 
-all_data_joined = gas_all_items_avg_price_joined.join(btc_grouped_and_aggregated_sorted,["year"])
+all_data_joined = wage_gas_all_items_avg_price_joined_sorted.join(btc_grouped_and_aggregated_sorted,["year"])
 display(all_data_joined)
 
 # COMMAND ----------
@@ -432,8 +432,8 @@ display(all_data_joined)
 from pyspark.sql.window import Window
 W = Window.orderBy('year')
 
-percent_change = gas_price_grouped_aggregated_sorted.withColumn('gas price average-1',f.lag(gas_price_grouped_aggregated_sorted['gas price average']).over(W))\
-  .withColumn('gas price(% change) year over year', f.round(((f.col('gas price average') - f.col('gas price average-1'))/f.col('gas price average-1')*100),2))
+percent_change = gas_price_grouped_aggregated_sorted.withColumn('gas avg-1',f.lag(gas_price_grouped_aggregated_sorted['gas avg']).over(W))\
+  .withColumn('gas price(% change) year over year', f.round(((f.col('gas avg') - f.col('gas avg-1'))/f.col('gas avg-1')*100),2))
 #percent_change.show()
 gas_price_percent_change_only = percent_change.select(col("year"), col("gas price(% change) year over year"))
 display(gas_price_percent_change_only)
@@ -462,8 +462,8 @@ display(gas_price_percent_change_sorted_by_inflation.take(1))
 from pyspark.sql.window import Window
 W = Window.orderBy('year')
 
-all_items_percent_change = all_tems_grouped_aggregated_sorted.withColumn('all items price average-1',f.lag(all_tems_grouped_aggregated_sorted['all items price average']).over(W))\
-  .withColumn('all items price(% change) year over year', f.round(((f.col('all items price average') - f.col('all items price average-1'))/f.col('all items price average-1')*100),2))
+all_items_percent_change = all_tems_grouped_aggregated_sorted.withColumn('all items avg-1',f.lag(all_tems_grouped_aggregated_sorted['all items avg']).over(W))\
+  .withColumn('all items price(% change) year over year', f.round(((f.col('all items avg') - f.col('all items avg-1'))/f.col('all items avg-1')*100),2))
 #percent_change.show()
 all_items_percent_change_only = all_items_percent_change.select(col("year"), col("all items price(% change) year over year"))
 display(all_items_percent_change_only)
@@ -486,3 +486,61 @@ all_items_percent_change_sorted_by_inflation = all_items_percent_change_only.sor
 
 #select the lowest inflation for all items price
 display(all_items_percent_change_sorted_by_inflation.take(1))
+
+# COMMAND ----------
+
+from pyspark.sql.window import Window
+W = Window.orderBy('year')
+
+btc_percent_change = btc_grouped_and_aggregated_sorted.withColumn('BTC avg-1',f.lag(btc_grouped_and_aggregated_sorted['BTC avg']).over(W))\
+  .withColumn('BTC price (% change) year over year', f.round(((f.col('BTC avg') - f.col('BTC avg-1'))/f.col('BTC avg-1')*100),2))
+#btc_percent_change.show()
+btc_percent_change_change_only = btc_percent_change.select(col("year"), col("BTC price (% change) year over year"))
+display(btc_percent_change_change_only)
+
+# COMMAND ----------
+
+# When was the highest index change for BTC between 2014 to 2022
+btc_percent_change_change_sorted_by_inflation = btc_percent_change_change_only.sort(col('BTC price (% change) year over year').desc()).na.drop()
+#display(btc_percent_change_change_sorted_by_inflation)
+
+#select the highest inflation for BTC for all time
+display(btc_percent_change_change_sorted_by_inflation.take(1))
+
+# COMMAND ----------
+
+# When was the lowest index change for BTC between 2014 to 2022
+btc_percent_change_change_sorted_by_inflation = btc_percent_change_change_only.sort(col('BTC price (% change) year over year').asc()).na.drop()
+#display(btc_percent_change_change_sorted_by_inflation)
+
+#select the lowest inflation for BTC for all time
+display(btc_percent_change_change_sorted_by_inflation.take(1))
+
+# COMMAND ----------
+
+from pyspark.sql.window import Window
+W = Window.orderBy('year')
+
+weekly_wage_percent_change = weekly_wages_grouped_aggregated_sorted.withColumn('weekly wage avg-1',f.lag(weekly_wages_grouped_aggregated_sorted['weekly wage avg']).over(W))\
+  .withColumn('weekly wage (% change) year over year', f.round(((f.col('weekly wage avg') - f.col('weekly wage avg-1'))/f.col('weekly wage avg-1')*100),2))
+#weekly_wage_percent_change.show()
+weekly_wage_percent_change_only = weekly_wage_percent_change.select(col("year"), col("weekly wage (% change) year over year"))
+display(weekly_wage_percent_change_only)
+
+# COMMAND ----------
+
+# When was the highest index change for weekly wage change for U.S full time employees between 1979 to 2022
+weekly_wage_percent_change_change_sorted_by_inflation = weekly_wage_percent_change_only.sort(col('weekly wage (% change) year over year').desc()).na.drop()
+#display(weekly_wage_percent_change_change_sorted_by_inflation)
+
+#select the highest inflation for weekly wage
+display(weekly_wage_percent_change_change_sorted_by_inflation.take(1))
+
+# COMMAND ----------
+
+# When was the lowest index change for weekly change for U.S full time employess between 1979 to 2022
+weekly_wage_percent_change_change_sorted_by_inflation = weekly_wage_percent_change_only.sort(col('weekly wage (% change) year over year').asc()).na.drop()
+#display(weekly_wage_percent_change_change_sorted_by_inflation)
+
+#select the lowest inflation for weekly wage
+display(weekly_wage_percent_change_change_sorted_by_inflation.take(1))
