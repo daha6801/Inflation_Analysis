@@ -26,9 +26,8 @@ import os
 # Source the Gasoline data based on the series id using the data tool API provided by US department of Labor. More information on the series ids https://download.bls.gov/pub/time.series/ap/ap.series
 # APU000074714  - Gasoline, unleaded regular, per gallon/3.785 liters in U.S. city average, average price, not seasonally adjusted		1976	M01	2022	M03  https://download.bls.gov/pub/time.series/ap/ap.data.2.Gasoline
 
-#headers = {'Content-type': 'application/json'}
-#auth = HTTPBasicAuth('apikey','bf323d2b0dff40a79cf1df469caec067')
-## CUSR0000SA0      	0000	SA0	S	R	S	1982-84=100	All items in U.S. city average, all urban consumers, seasonally adjusted		1947	M01	2022	M03  https://download.bls.gov/pub/time.series/cu/cu.data.1.AllItems
+headers = {'Content-type': 'application/json'}
+auth = HTTPBasicAuth('apikey','bf323d2b0dff40a79cf1df469caec067')
 startyeardate = 1976
 endyeardate = 1986
 master_string = ""
@@ -190,7 +189,7 @@ wages = spark.read.text(
   'dbfs:/FileStore/my-stuff/LEU02528815005.txt'
 )
 #gas_price.printSchema()
-display(wages)
+#display(wages)
 
 # COMMAND ----------
 
